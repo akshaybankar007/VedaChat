@@ -112,12 +112,13 @@ const Chat = () => {
 
             {/* Sidebar */}
             <div className={`chat-sidebar ${sidebarOpen ? 'open' : ''}`}>
-                <div style={{ padding: "20px" }}>
+                <div style={{ padding: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <h3 className="auth-title" style={{ margin: 0, fontSize: "1.5rem" }}>VedaChat</h3>
+                    <span style={{ fontSize: "1.2rem", cursor: "pointer" }}>📝</span>
                 </div>
                 
-                <div style={{ padding: "0 20px 10px", fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: "600", textTransform: "uppercase" }}>
-                    Network
+                <div style={{ padding: "0 20px 10px", fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: "600" }}>
+                    Messages
                 </div>
                 
                 <div style={{ flex: 1, overflowY: "auto" }}>
@@ -127,7 +128,10 @@ const Chat = () => {
                                 {u.username.charAt(0).toUpperCase()}
                                 <span className={`status-dot ${u.isOnline ? 'status-online' : 'status-offline'}`}></span>
                             </div>
-                            <span style={{ fontWeight: "500", fontSize: "0.95rem" }}>{u.username}</span>
+                            <div style={{ display: "flex", flexDirection: "column" }}>
+                                <span style={{ fontWeight: "600", fontSize: "0.95rem" }}>{u.username}</span>
+                                <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{u.isOnline ? 'Active now' : 'Offline'}</span>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -139,7 +143,7 @@ const Chat = () => {
                         </div>
                         <span style={{ fontWeight: "600", fontSize: "0.9rem" }}>{user?.username}</span>
                     </div>
-                    <button onClick={logout} style={{ background: "transparent", color: "var(--text-muted)", border: "none", cursor: "pointer", fontSize: "0.85rem" }}>
+                    <button onClick={logout} style={{ background: "transparent", color: "#ff416c", border: "none", cursor: "pointer", fontSize: "0.85rem", fontWeight: "600" }}>
                         Log Out
                     </button>
                 </div>
@@ -151,9 +155,12 @@ const Chat = () => {
                     <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)}>
                         ☰
                     </button>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <div className="avatar" style={{ width: "40px", height: "40px" }}>#</div>
-                        <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: "600" }}>the-abyss</h2>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                        <div className="avatar" style={{ width: "32px", height: "32px", marginBottom: "4px", fontSize: "0.9rem" }}>
+                            ♡
+                        </div>
+                        <h2 style={{ margin: 0, fontSize: "1rem", fontWeight: "600" }}>Global Chat</h2>
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>VedaChat Network</span>
                     </div>
                 </div>
 
@@ -189,16 +196,21 @@ const Chat = () => {
 
                 <div className="chat-input-container">
                     <form onSubmit={handleSend} className="chat-input-form">
+                        <span style={{ color: "var(--text-muted)", fontSize: "1.2rem", cursor: "pointer", paddingLeft: "5px" }}>📷</span>
                         <input 
                             type="text" 
                             className="chat-input" 
                             value={newMessage} 
                             onChange={handleInputChange} 
-                            placeholder="Message #the-abyss..." 
+                            placeholder="Message..." 
                         />
-                        <button type="submit" className="chat-send-btn">
-                            ↑
-                        </button>
+                        {newMessage.trim() ? (
+                            <button type="submit" className="chat-send-btn">
+                                💌
+                            </button>
+                        ) : (
+                            <span style={{ color: "var(--text-muted)", fontSize: "1.2rem", cursor: "pointer", paddingRight: "5px" }}>🎤</span>
+                        )}
                     </form>
                 </div>
             </div>
