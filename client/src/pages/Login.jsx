@@ -15,7 +15,8 @@ const Login = () => {
             await login(identifier, password);
         } catch (err) {
             console.error("Login Error:", err);
-            alert("Authentication failed. Sure you typed that right?");
+            const backendError = err.response?.data?.message || err.message || "Authentication failed.";
+            alert(`Access Denied: ${backendError}`);
         } finally {
             setLoading(false);
         }

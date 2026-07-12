@@ -16,7 +16,9 @@ const Register = () => {
             await register(formData.username, formData.email, formData.phone, formData.password);
         } catch (err) {
             console.error("Register Error:", err);
-            alert("Registration failed. Data rejected.");
+            // Now falling back to err.message to catch "Network Error" when backend is dead
+            const backendError = err.response?.data?.message || err.message || "Data rejected.";
+            alert(`Tragic failure: ${backendError}`);
         } finally {
             setLoading(false);
         }
