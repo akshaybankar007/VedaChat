@@ -10,45 +10,52 @@ const generateToken = (id) => {
     );
 };
 
-export const register = async (req, res) => {
+export const register = async (req, res, next) => {
     try {
-        const { username, email, phone, password } = req.body;
+        // Gap 19 / Logic 5: Strict early trim prevents bypass
+        const username = req.body.username?.trim();
+        const email = req.body.email?.trim();
+        const phone = req.body.phone?.trim();
+        const password = req.body.password;
 
-        const orConditions = [{ username }];
-        if (email && email.trim() !== "") orConditions.push({ email });
-        if (phone && phone.trim() !== "") orConditions.push({ phone });
-
-        const existingUser = await User.findOne({ $or: orConditions });
-
-        if (existingUser) {
-            return res.status(400).json({ success: false, message: "User already exists. Be original." });
+        if (!password || password.length < 6) {
+            return res.status(400).json({ success: false, message: "Password must be at least 6 characters long." });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
         
         const userData = { username, password: hashedPassword };
-        if (email && email.trim() !== "") userData.email = email;
-        if (phone && phone.trim() !== "") userData.phone = phone;
+        if (email) userData.email = email;
+        if (phone) userData.phone = phone;
 
+        // Logic 6: Removed explicit pre-check to let MongoDB's unique index natively trigger 11000 Error
         const user = await User.create(userData);
 
         res.status(201).json({
             success: true,
             message: "Registration successful",
             token: generateToken(user._id),
-            user: { id: user._id, username: user.username, email: user.email, phone: user.phone }
+            // Inconsistency 13: Returned _id to match UI mapping
+            user: { _id: user._id, username: user.username, email: user.email, phone: user.phone }
         });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        next(error); // Inconsistency 10
     }
 };
 
-export const login = async (req, res) => {
+export const login = async (req, res, next) => {
     try {
-        const { identifier, password } = req.body;
+        const identifier = req.body.identifier?.trim(); // Gap 19
+        const password = req.body.password;
+
+        if (!identifier || !password) {
+            return res.status(400).json({ success: false, message: "Provide identifier and password" });
+        }
+
+        // Critical 2 fix requires `.select("+password")` to log them in
         const user = await User.findOne({
             $or: [{ username: identifier }, { email: identifier }, { phone: identifier }]
-        });
+        }).select("+password");
 
         if (!user) {
             return res.status(400).json({ success: false, message: "Invalid credentials" });
@@ -64,9 +71,9 @@ export const login = async (req, res) => {
             success: true,
             message: "Login successful",
             token: generateToken(user._id),
-            user: { id: user._id, username: user.username, email: user.email, phone: user.phone }
+            user: { _id: user._id, username: user.username, email: user.email, phone: user.phone } // Inconsistency 13
         });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        next(error); // Inconsistency 10
     }
 };

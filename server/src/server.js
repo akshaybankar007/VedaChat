@@ -13,20 +13,36 @@ import User from "./models/User.js";
 import { errorHandler } from "./middleware/errorMiddleware.js";
 
 dotenv.config();
+
+// Critical 18: Process level handlers
+process.on('uncaughtException', (err) => {
+    console.error('UNCAUGHT EXCEPTION! Shutting down...', err);
+    process.exit(1);
+});
+
+// Critical 18: Environment variable startup check
+if (!process.env.JWT_SECRET || !process.env.MONGO_URI) {
+    console.error("FATAL ERROR: JWT_SECRET or MONGO_URI is not defined.");
+    process.exit(1);
+}
+
 connectDB();
 
 const app = express();
 const server = http.createServer(app);
 
+// Inconsistency 14: Unified CORS definition
+const CORS_ORIGIN = process.env.CLIENT_URL || "http://localhost:5173";
+
 const io = new Server(server, {
     cors: {
-        origin: process.env.CLIENT_URL || "http://localhost:5173",
+        origin: CORS_ORIGIN,
         credentials: true
     }
 });
 
 app.use(cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: CORS_ORIGIN,
     credentials: true
 }));
 
@@ -37,6 +53,13 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/users", userRoutes);
 
 app.get("/", (req, res) => res.status(200).json({ success: true, message: "VEDACHAT Backend Running 🚀" }));
+
+// Gap 18: Catch-all 404 router before global error handler
+app.all('*', (req, res, next) => {
+    const err = new Error(`Route ${req.originalUrl} not found`);
+    err.statusCode = 404;
+    next(err);
+});
 
 app.use(errorHandler);
 
@@ -57,40 +80,60 @@ io.on("connection", (socket) => {
     socket.join(socket.userId);
 
     socket.on("user_join", async () => {
-        await User.findByIdAndUpdate(socket.userId, { isOnline: true });
-        io.emit("user_status", { userId: socket.userId, isOnline: true });
+        try { // Critical 1: Try/Catch wrapper
+            await User.findByIdAndUpdate(socket.userId, { isOnline: true });
+            io.emit("user_status", { userId: socket.userId, isOnline: true });
+        } catch (err) {
+            console.error("user_join failed", err);
+        }
     });
 
     socket.on("send_message", async (data) => {
         try {
             const { receiverId, text } = data;
-            const newMessage = await Message.create({ sender: socket.userId, receiver: receiverId, text });
+            
+            // Inconsistency 11: Payload validation
+            if (!receiverId || !text || typeof text !== 'string' || text.trim() === '') {
+                return socket.emit("message_error", { message: "Invalid message payload" }); // Logic 9: Failure feedback
+            }
+            
+            const newMessage = await Message.create({ sender: socket.userId, receiver: receiverId, text: text.trim() });
             const populatedMessage = await newMessage.populate("sender", "username");
             
             io.to(receiverId).to(socket.userId).emit("receive_message", populatedMessage);
         } catch (err) {
             console.error("Message failed to save.", err);
+            socket.emit("message_error", { message: "Failed to send message", error: err.message }); 
         }
     });
 
-    // Mark messages as read
     socket.on("mark_read", async ({ senderId }) => {
-        await Message.updateMany(
-            { sender: senderId, receiver: socket.userId, isRead: false },
-            { isRead: true }
-        );
-        io.to(senderId).emit("messages_read", { readerId: socket.userId });
+        try {
+            if (!senderId) return socket.emit("message_error", { message: "Invalid senderId payload" });
+            
+            await Message.updateMany(
+                { sender: senderId, receiver: socket.userId, isRead: false },
+                { isRead: true }
+            );
+            io.to(senderId).emit("messages_read", { readerId: socket.userId });
+        } catch (err) {
+            console.error("mark_read failed", err);
+        }
     });
 
-    // Delete message
     socket.on("delete_message", async ({ messageId, receiverId }) => {
         try {
+            if (!messageId || !receiverId) return socket.emit("message_error", { message: "Invalid delete payload" });
+
             const msg = await Message.findOneAndDelete({ _id: messageId, sender: socket.userId });
             if (msg) {
                 io.to(receiverId).to(socket.userId).emit("message_deleted", messageId);
+            } else {
+                socket.emit("message_error", { message: "Message not found or unauthorized to delete" });
             }
         } catch (err) {
             console.error("Delete failed.", err);
+            socket.emit("message_error", { message: "Failed to delete message", error: err.message });
         }
     });
 
@@ -98,12 +141,28 @@ io.on("connection", (socket) => {
     socket.on("stop_typing", ({ receiverId }) => socket.to(receiverId).emit("user_stop_typing", socket.userId));
 
     socket.on("disconnect", async () => {
-        if (socket.userId) {
-            await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen: new Date() });
-            io.emit("user_status", { userId: socket.userId, isOnline: false });
+        try {
+            if (socket.userId) {
+                // Critical 4: Presence Tracking Connection Reference Count
+                const matchingSockets = await io.in(socket.userId).fetchSockets();
+                const isDisconnected = matchingSockets.length === 0;
+
+                if (isDisconnected) {
+                    await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen: new Date() });
+                    io.emit("user_status", { userId: socket.userId, isOnline: false });
+                }
+            }
+        } catch (err) {
+            console.error("disconnect handler failed", err);
         }
     });
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server surviving on http://localhost:${PORT}`));
+const serverInstance = server.listen(PORT, () => console.log(`Server surviving on http://localhost:${PORT}`));
+
+// Critical 18: Unhandled Promise Rejections process shutdown
+process.on('unhandledRejection', (err) => {
+    console.error('UNHANDLED REJECTION! Shutting down...', err);
+    serverInstance.close(() => process.exit(1));
+});

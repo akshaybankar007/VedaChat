@@ -14,7 +14,9 @@ const messageSchema = new mongoose.Schema(
         },
         text: { 
             type: String, 
-            required: true 
+            required: true,
+            trim: true, // Gap 15: Space sanitization
+            maxlength: [2000, "Message cannot exceed 2000 characters"] // Gap 15: Unbounded size risk
         },
         isRead: {
             type: Boolean,
@@ -24,8 +26,8 @@ const messageSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-
 messageSchema.index({ sender: 1, receiver: 1, createdAt: -1 });
+messageSchema.index({ receiver: 1, sender: 1, isRead: 1 }); // Gap 17: Fixed index match for unread query
 messageSchema.index({ isRead: 1 });
 
 export default mongoose.model("Message", messageSchema);

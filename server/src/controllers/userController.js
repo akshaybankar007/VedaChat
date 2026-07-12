@@ -1,42 +1,64 @@
+import mongoose from "mongoose";
 import User from "../models/User.js";
-import Message from "../models/Message.js";
 
-export const getUsers = async (req, res) => {
+export const getUsers = async (req, res, next) => {
     try {
-        const currentUserId = req.user.id;
+        const currentUserId = new mongoose.Types.ObjectId(req.user.id);
         
-        const users = await User.find({ _id: { $ne: currentUserId } })
-            .select("username isOnline lastSeen")
-            .sort({ isOnline: -1, username: 1 })
-            .lean();
-            
-        const usersWithData = await Promise.all(users.map(async (user) => {
-            const lastMsg = await Message.findOne({
-                $or: [
-                    { sender: currentUserId, receiver: user._id },
-                    { sender: user._id, receiver: currentUserId }
-                ]
-            })
-            .sort({ createdAt: -1 })
-            .select("text createdAt");
-
-            // Count unread messages from this user to the current user
-            const unreadCount = await Message.countDocuments({
-                sender: user._id,
-                receiver: currentUserId,
-                isRead: false
-            });
-
-            return {
-                ...user,
-                lastMessage: lastMsg ? lastMsg.text : null,
-                lastMessageTime: lastMsg ? lastMsg.createdAt : null,
-                unreadCount
-            };
-        }));
+        // Gap 16: Removed N+1 bottleneck entirely via unified aggregation 
+        const usersWithData = await User.aggregate([
+            { $match: { _id: { $ne: currentUserId } } },
+            {
+                $lookup: {
+                    from: "messages",
+                    let: { otherId: "$_id" },
+                    pipeline: [
+                        { $match: {
+                            $expr: {
+                                $or: [
+                                    { $and: [{ $eq: ["$sender", "$$otherId"] }, { $eq: ["$receiver", currentUserId] }] },
+                                    { $and: [{ $eq: ["$sender", currentUserId] }, { $eq: ["$receiver", "$$otherId"] }] }
+                                ]
+                            }
+                        }},
+                        { $sort: { createdAt: -1 } },
+                        { $limit: 1 }
+                    ],
+                    as: "lastMessageDoc"
+                }
+            },
+            {
+                $lookup: {
+                    from: "messages",
+                    let: { otherId: "$_id" },
+                    pipeline: [
+                        { $match: {
+                            $expr: {
+                                $and: [
+                                    { $eq: ["$sender", "$$otherId"] },
+                                    { $eq: ["$receiver", currentUserId] },
+                                    { $eq: ["$isRead", false] }
+                                ]
+                            }
+                        }},
+                        { $count: "unreadCount" }
+                    ],
+                    as: "unreadData"
+                }
+            },
+            {
+                $addFields: {
+                    lastMessage: { $arrayElemAt: ["$lastMessageDoc.text", 0] },
+                    lastMessageTime: { $arrayElemAt: ["$lastMessageDoc.createdAt", 0] },
+                    unreadCount: { $ifNull: [{ $arrayElemAt: ["$unreadData.unreadCount", 0] }, 0] }
+                }
+            },
+            { $project: { password: 0, lastMessageDoc: 0, unreadData: 0, email: 0, phone: 0, createdAt: 0, updatedAt: 0, __v: 0 } },
+            { $sort: { isOnline: -1, username: 1 } }
+        ]);
             
         res.json({ success: true, users: usersWithData });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        next(error); // Inconsistency 10
     }
 };
