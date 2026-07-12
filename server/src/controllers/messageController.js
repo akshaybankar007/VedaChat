@@ -1,15 +1,25 @@
 import Message from "../models/Message.js";
 
-export const getMessages = async (req, res) => {
+export const getMessages = async (req, res, next) => {
     try {
-        // Fetch the last 50 messages only because we have free database tier only
-        const messages = await Message.find()
+        const limit = parseInt(req.query.limit) || 50;
+        const cursor = req.query.cursor; 
+
+        let query = {};
+        if (cursor) {
+            const lastMessage = await Message.findById(cursor);
+            if (lastMessage) {
+                query = { createdAt: { $lt: lastMessage.createdAt } };
+            }
+        }
+
+        const messages = await Message.find(query)
             .populate("sender", "username")
-            .sort({ createdAt: 1 })
-            .limit(50);
+            .sort({ createdAt: -1 }) 
+            .limit(limit);
             
-        res.json({ success: true, messages });
+        res.json({ success: true, messages: messages.reverse() });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        next(error); 
     }
 };

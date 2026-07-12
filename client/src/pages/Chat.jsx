@@ -10,8 +10,11 @@ const Chat = () => {
     const [users, setUsers] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const [typingUsers, setTypingUsers] = useState([]);
+    const [hasMore, setHasMore] = useState(true);
+    
     const messagesEndRef = useRef(null);
     const typingTimeoutRef = useRef(null);
+    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
     useEffect(() => {
         const fetchInitialData = async () => {
@@ -20,18 +23,19 @@ const Chat = () => {
                 const headers = { Authorization: `Bearer ${token}` };
                 
                 const [msgRes, usersRes] = await Promise.all([
-                    axios.get("http://localhost:5000/api/messages", { headers }),
-                    axios.get("http://localhost:5000/api/users", { headers })
+                    axios.get(`${API_URL}/api/messages?limit=50`, { headers }),
+                    axios.get(`${API_URL}/api/users`, { headers })
                 ]);
                 
                 setMessages(msgRes.data.messages);
                 setUsers(usersRes.data.users);
+                if (msgRes.data.messages.length < 50) setHasMore(false);
             } catch (err) {
-                console.error("Failed to load initial data. The database is likely suffering.", err);
+                console.error("Failed to load initial data. Server probably crashed.", err);
             }
         };
         fetchInitialData();
-    }, []);
+    }, [API_URL]);
 
     useEffect(() => {
         if (!socket || !user) return;
@@ -39,18 +43,9 @@ const Chat = () => {
         socket.emit("user_join");
 
         const handleReceive = (message) => setMessages((prev) => [...prev, message]);
-        
-        const handleUserStatus = ({ userId, isOnline }) => {
-            setUsers((prev) => prev.map((u) => u._id === userId ? { ...u, isOnline } : u));
-        };
-
-        const handleTyping = (username) => {
-            setTypingUsers((prev) => prev.includes(username) ? prev : [...prev, username]);
-        };
-
-        const handleStopTyping = (username) => {
-            setTypingUsers((prev) => prev.filter((u) => u !== username));
-        };
+        const handleUserStatus = ({ userId, isOnline }) => setUsers((prev) => prev.map((u) => u._id === userId ? { ...u, isOnline } : u));
+        const handleTyping = (username) => setTypingUsers((prev) => prev.includes(username) ? prev : [...prev, username]);
+        const handleStopTyping = (username) => setTypingUsers((prev) => prev.filter((u) => u !== username));
 
         socket.on("receive_message", handleReceive);
         socket.on("user_status", handleUserStatus);
@@ -69,34 +64,42 @@ const Chat = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, typingUsers]);
 
+    const loadMoreMessages = async () => {
+        if (!messages.length) return;
+        try {
+            const token = localStorage.getItem("token");
+            const firstMsgId = messages[0]._id;
+            const { data } = await axios.get(`${API_URL}/api/messages?cursor=${firstMsgId}&limit=50`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            if (data.messages.length < 50) setHasMore(false);
+            setMessages((prev) => [...data.messages, ...prev]);
+        } catch (err) {
+            console.error("Pagination failed.", err);
+        }
+    };
+
     const handleInputChange = (e) => {
         setNewMessage(e.target.value);
         if (!socket || !user) return;
 
         socket.emit("typing", user.username);
-
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        
-        typingTimeoutRef.current = setTimeout(() => {
-            socket.emit("stop_typing", user.username);
-        }, 2000);
+        typingTimeoutRef.current = setTimeout(() => socket.emit("stop_typing", user.username), 2000);
     };
 
     const handleSend = (e) => {
         e.preventDefault();
         if (!newMessage.trim() || !socket) return;
 
-        // Removing senderId. The server verifies identity now.
         socket.emit("send_message", { text: newMessage });
         socket.emit("stop_typing", user.username);
         setNewMessage("");
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
 
-    const formatTime = (dateString) => {
-        if (!dateString) return "";
-        return new Date(dateString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    };
+    const formatTime = (dateString) => dateString ? new Date(dateString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "";
 
     const theme = {
         bgDark: "#12121a", sidebar: "#1c1c26", textLight: "#e2e2ea", 
@@ -141,6 +144,12 @@ const Chat = () => {
                 </div>
 
                 <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    {hasMore && (
+                        <button onClick={loadMoreMessages} style={{ alignSelf: "center", background: theme.inputBg, color: theme.textMuted, border: "none", padding: "8px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "0.85rem" }}>
+                            Dig deeper into the void
+                        </button>
+                    )}
+
                     {messages.map((msg, index) => {
                         const isSelf = msg.sender?._id === user.id;
                         return (
@@ -149,13 +158,7 @@ const Chat = () => {
                                     {!isSelf && <span style={{ fontSize: "0.75rem", color: theme.textMuted }}>{msg.sender?.username || "Unknown Entity"}</span>}
                                     <span style={{ fontSize: "0.65rem", color: theme.textMuted }}>{formatTime(msg.createdAt)}</span>
                                 </div>
-                                <div style={{ 
-                                    background: isSelf ? theme.bubbleSelf : theme.bubbleOther, 
-                                    color: "white", padding: "10px 14px", borderRadius: "16px", 
-                                    borderBottomRightRadius: isSelf ? "4px" : "16px", 
-                                    borderBottomLeftRadius: isSelf ? "16px" : "4px", 
-                                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)", lineHeight: "1.4" 
-                                }}>
+                                <div style={{ background: isSelf ? theme.bubbleSelf : theme.bubbleOther, color: "white", padding: "10px 14px", borderRadius: "16px", borderBottomRightRadius: isSelf ? "4px" : "16px", borderBottomLeftRadius: isSelf ? "16px" : "4px", boxShadow: "0 2px 4px rgba(0,0,0,0.1)", lineHeight: "1.4" }}>
                                     {msg.text}
                                 </div>
                             </div>
@@ -172,11 +175,7 @@ const Chat = () => {
 
                 <div style={{ padding: "0 1.5rem 1.5rem 1.5rem" }}>
                     <form onSubmit={handleSend} style={{ display: "flex", gap: "10px", backgroundColor: theme.inputBg, padding: "8px", borderRadius: "8px" }}>
-                        <input
-                            type="text" value={newMessage} onChange={handleInputChange}
-                            placeholder={`Message #the-abyss`}
-                            style={{ flex: 1, padding: "12px", borderRadius: "6px", border: "none", backgroundColor: "transparent", color: "white", outline: "none", fontSize: "1rem" }}
-                        />
+                        <input type="text" value={newMessage} onChange={handleInputChange} placeholder={`Message #the-abyss`} style={{ flex: 1, padding: "12px", borderRadius: "6px", border: "none", backgroundColor: "transparent", color: "white", outline: "none", fontSize: "1rem" }} />
                         <button type="submit" style={{ padding: "10px 24px", background: theme.primary, color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "600", transition: "0.2s" }}>Send</button>
                     </form>
                 </div>

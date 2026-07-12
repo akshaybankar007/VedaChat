@@ -10,6 +10,7 @@ import messageRoutes from "./routes/messageRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import Message from "./models/Message.js";
 import User from "./models/User.js";
+import { errorHandler } from "./middleware/errorMiddleware.js";
 
 dotenv.config();
 connectDB();
@@ -36,20 +37,19 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/users", userRoutes);
 
 app.get("/", (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: "VEDACHAT Backend Running 🚀"
-    });
+    res.status(200).json({ success: true, message: "VEDACHAT Backend Running 🚀" });
 });
 
-// Socket Authentication Middleware
+// The safety net for your chaotic code
+app.use(errorHandler);
+
 io.use((socket, next) => {
     const token = socket.handshake.auth?.token;
     if (!token) return next(new Error("Authentication error: Token missing. How amateur."));
     
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        socket.userId = decoded.id; // Trust the token, not the client
+        socket.userId = decoded.id;
         next();
     } catch (err) {
         next(new Error("Authentication error: Invalid token."));
@@ -57,7 +57,7 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
-    console.log(`Authenticated entity connected: ${socket.userId}. Let's see how long before they break something.`);
+    console.log(`Authenticated entity connected: ${socket.userId}.`);
 
     socket.on("user_join", async () => {
         await User.findByIdAndUpdate(socket.userId, { isOnline: true });
@@ -66,7 +66,6 @@ io.on("connection", (socket) => {
 
     socket.on("send_message", async (data) => {
         try {
-            // Force sender ID to be the authenticated socket's ID to prevent spoofing
             const newMessage = await Message.create({ sender: socket.userId, text: data.text });
             const populatedMessage = await newMessage.populate("sender", "username");
             io.emit("receive_message", populatedMessage);
@@ -75,13 +74,8 @@ io.on("connection", (socket) => {
         }
     });
 
-    socket.on("typing", (username) => {
-        socket.broadcast.emit("user_typing", username);
-    });
-
-    socket.on("stop_typing", (username) => {
-        socket.broadcast.emit("user_stop_typing", username);
-    });
+    socket.on("typing", (username) => socket.broadcast.emit("user_typing", username));
+    socket.on("stop_typing", (username) => socket.broadcast.emit("user_stop_typing", username));
 
     socket.on("disconnect", async () => {
         console.log(`Entity disconnected: ${socket.userId}. They escaped.`);

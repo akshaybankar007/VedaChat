@@ -8,16 +8,17 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(JSON.parse(localStorage.getItem("user")) || null);
+    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
     const login = async (identifier, password) => {
-        const { data } = await axios.post("http://localhost:5000/api/auth/login", { identifier, password });
+        const { data } = await axios.post(`${API_URL}/api/auth/login`, { identifier, password });
         localStorage.setItem("user", JSON.stringify(data.user));
         localStorage.setItem("token", data.token);
         setUser(data.user);
     };
 
     const register = async (username, email, phone, password) => {
-        const { data } = await axios.post("http://localhost:5000/api/auth/register", { username, email, phone, password });
+        const { data } = await axios.post(`${API_URL}/api/auth/register`, { username, email, phone, password });
         localStorage.setItem("user", JSON.stringify(data.user));
         localStorage.setItem("token", data.token);
         setUser(data.user);
@@ -26,7 +27,6 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         localStorage.clear();
         setUser(null);
-        // Force a reload to sever the websocket connection
         window.location.href = "/login"; 
     };
 

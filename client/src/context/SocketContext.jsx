@@ -10,27 +10,22 @@ export const useSocket = () => useContext(SocketContext);
 export const SocketProvider = ({ children }) => {
     const [socket, setSocket] = useState(null);
     const { user } = useAuth();
+    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
     useEffect(() => {
-        // Prevent rogue connections from unauthenticated ghosts
         if (!user) {
             if (socket) socket.close();
             return;
         }
 
         const token = localStorage.getItem("token");
-        const newSocket = io("http://localhost:5000", {
+        const newSocket = io(API_URL, {
             auth: { token },
             withCredentials: true,
         });
         
-        newSocket.on("connect", () => {
-            setSocket(newSocket);
-        });
-
-        newSocket.on("connect_error", (err) => {
-            console.error("Socket authentication rejected:", err.message);
-        });
+        newSocket.on("connect", () => setSocket(newSocket));
+        newSocket.on("connect_error", (err) => console.error("Socket rejected:", err.message));
         
         return () => newSocket.close();
     }, [user]);
