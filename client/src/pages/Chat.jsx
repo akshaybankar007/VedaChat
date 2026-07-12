@@ -27,7 +27,7 @@ const Chat = () => {
                 setMessages(msgRes.data.messages);
                 setUsers(usersRes.data.users);
             } catch (err) {
-                console.error("Failed to load initial data.", err);
+                console.error("Failed to load initial data. The database is likely suffering.", err);
             }
         };
         fetchInitialData();
@@ -36,7 +36,7 @@ const Chat = () => {
     useEffect(() => {
         if (!socket || !user) return;
 
-        socket.emit("user_join", user.id);
+        socket.emit("user_join");
 
         const handleReceive = (message) => setMessages((prev) => [...prev, message]);
         
@@ -86,7 +86,8 @@ const Chat = () => {
         e.preventDefault();
         if (!newMessage.trim() || !socket) return;
 
-        socket.emit("send_message", { senderId: user.id, text: newMessage });
+        // Removing senderId. The server verifies identity now.
+        socket.emit("send_message", { text: newMessage });
         socket.emit("stop_typing", user.username);
         setNewMessage("");
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);

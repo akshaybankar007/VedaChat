@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import http from "http";
 import { Server } from "socket.io";
+import jwt from "jsonwebtoken";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
@@ -41,37 +42,49 @@ app.get("/", (req, res) => {
     });
 });
 
-io.on("connection", (socket) => {
-    console.log(`User connected: ${socket.id}. Let's see how long before they break something.`);
+// Socket Authentication Middleware
+io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error("Authentication error: Token missing. How amateur."));
+    
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        socket.userId = decoded.id; // Trust the token, not the client
+        next();
+    } catch (err) {
+        next(new Error("Authentication error: Invalid token."));
+    }
+});
 
-    socket.on("user_join", async (userId) => {
-        socket.userId = userId;
-        await User.findByIdAndUpdate(userId, { isOnline: true });
-        io.emit("user_status", { userId, isOnline: true });
+io.on("connection", (socket) => {
+    console.log(`Authenticated entity connected: ${socket.userId}. Let's see how long before they break something.`);
+
+    socket.on("user_join", async () => {
+        await User.findByIdAndUpdate(socket.userId, { isOnline: true });
+        io.emit("user_status", { userId: socket.userId, isOnline: true });
     });
 
     socket.on("send_message", async (data) => {
         try {
-            const newMessage = await Message.create({ sender: data.senderId, text: data.text });
+            // Force sender ID to be the authenticated socket's ID to prevent spoofing
+            const newMessage = await Message.create({ sender: socket.userId, text: data.text });
             const populatedMessage = await newMessage.populate("sender", "username");
             io.emit("receive_message", populatedMessage);
         } catch (err) {
-            console.error("Message failed to save. Shocking.", err);
+            console.error("Message failed to save. Tragic.", err);
         }
     });
 
-    // Broadcast to everyone else that someone is typing
     socket.on("typing", (username) => {
         socket.broadcast.emit("user_typing", username);
     });
 
-    // Broadcast that they finally stopped typing
     socket.on("stop_typing", (username) => {
         socket.broadcast.emit("user_stop_typing", username);
     });
 
     socket.on("disconnect", async () => {
-        console.log(`User disconnected: ${socket.id}. Probably rage quit.`);
+        console.log(`Entity disconnected: ${socket.userId}. They escaped.`);
         if (socket.userId) {
             await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen: new Date() });
             io.emit("user_status", { userId: socket.userId, isOnline: false });
@@ -82,5 +95,5 @@ io.on("connection", (socket) => {
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server surviving on http://localhost:${PORT}`);
 });
