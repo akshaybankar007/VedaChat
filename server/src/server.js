@@ -60,6 +60,16 @@ io.on("connection", (socket) => {
         }
     });
 
+    // Broadcast to everyone else that someone is typing
+    socket.on("typing", (username) => {
+        socket.broadcast.emit("user_typing", username);
+    });
+
+    // Broadcast that they finally stopped typing
+    socket.on("stop_typing", (username) => {
+        socket.broadcast.emit("user_stop_typing", username);
+    });
+
     socket.on("disconnect", async () => {
         console.log(`User disconnected: ${socket.id}. Probably rage quit.`);
         if (socket.userId) {
