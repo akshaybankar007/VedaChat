@@ -4,17 +4,18 @@ import { useToast } from "../context/ToastContext";
 import { Link } from "react-router-dom";
 
 const Login = () => {
-    const [identifier, setIdentifier] = useState("");
-    const [password, setPassword] = useState("");
+    const [formData, setFormData] = useState({ identifier: "", password: "" });
     const { login } = useAuth();
     const { showToast } = useToast();
     const [loading, setLoading] = useState(false);
+
+    const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
-            await login(identifier, password);
+            await login(formData.identifier, formData.password);
         } catch (err) {
             const backendError = err.response?.data?.message || err.message || "Authentication failed.";
             showToast(backendError, "error");
@@ -28,8 +29,8 @@ const Login = () => {
             <div className="auth-box">
                 <h2 className="auth-title">VedaChat</h2>
                 <form onSubmit={handleSubmit} className="auth-form">
-                    <input className="auth-input" type="text" placeholder="Username, Email, or Phone" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
-                    <input className="auth-input" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                    <input className="auth-input" name="identifier" type="text" placeholder="Username, Email, or Phone" onChange={handleChange} required />
+                    <input className="auth-input" name="password" type="password" placeholder="Password" onChange={handleChange} required />
                     <button type="submit" className="auth-btn" disabled={loading}>
                         {loading ? "Connecting..." : "Log In"}
                     </button>
