@@ -15,7 +15,7 @@ const Login = () => {
             await login(identifier, password);
         } catch (err) {
             console.error("Login Error:", err);
-            const backendError = err.response?.data?.message || err.message || "Authentication failed.";
+            const backendError = err.response?.data?.message || err.message || "Heartbreak. Authentication failed.";
             alert(`Access Denied: ${backendError}`);
         } finally {
             setLoading(false);
@@ -25,7 +25,7 @@ const Login = () => {
     return (
         <div className="auth-container">
             <div className="auth-box">
-                <h2 className="auth-title">VedaChat</h2>
+                <h2 className="auth-title">VedaChat 💌</h2>
                 <form onSubmit={handleSubmit} className="auth-form">
                     <input 
                         className="auth-input"
@@ -44,7 +44,7 @@ const Login = () => {
                         required 
                     />
                     <button type="submit" className="auth-btn" disabled={loading}>
-                        {loading ? "Authenticating..." : "Log In"}
+                        {loading ? "Connecting Hearts..." : "Log In 💖"}
                     </button>
                 </form>
                 <p className="auth-link">
