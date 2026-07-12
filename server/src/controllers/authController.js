@@ -14,16 +14,23 @@ export const register = async (req, res) => {
     try {
         const { username, email, phone, password } = req.body;
 
-        const existingUser = await User.findOne({
-            $or: [{ username }, { email }, { phone }]
-        });
+        const orConditions = [{ username }];
+        if (email && email.trim() !== "") orConditions.push({ email });
+        if (phone && phone.trim() !== "") orConditions.push({ phone });
+
+        const existingUser = await User.findOne({ $or: orConditions });
 
         if (existingUser) {
             return res.status(400).json({ success: false, message: "User already exists. Be original." });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const user = await User.create({ username, email, phone, password: hashedPassword });
+        
+        const userData = { username, password: hashedPassword };
+        if (email && email.trim() !== "") userData.email = email;
+        if (phone && phone.trim() !== "") userData.phone = phone;
+
+        const user = await User.create(userData);
 
         res.status(201).json({
             success: true,
@@ -39,7 +46,6 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
     try {
         const { identifier, password } = req.body;
-
         const user = await User.findOne({
             $or: [{ username: identifier }, { email: identifier }, { phone: identifier }]
         });
