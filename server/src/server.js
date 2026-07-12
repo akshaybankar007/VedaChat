@@ -40,12 +40,11 @@ app.get("/", (req, res) => {
     res.status(200).json({ success: true, message: "VEDACHAT Backend Running 🚀" });
 });
 
-// The safety net for your chaotic code
 app.use(errorHandler);
 
 io.use((socket, next) => {
     const token = socket.handshake.auth?.token;
-    if (!token) return next(new Error("Authentication error: Token missing. How amateur."));
+    if (!token) return next(new Error("Authentication error: Token missing."));
     
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -57,7 +56,10 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
-    console.log(`Authenticated entity connected: ${socket.userId}.`);
+    console.log(`User connected: ${socket.userId}`);
+    
+    // Join a personal room for private messaging
+    socket.join(socket.userId);
 
     socket.on("user_join", async () => {
         await User.findByIdAndUpdate(socket.userId, { isOnline: true });
@@ -66,19 +68,33 @@ io.on("connection", (socket) => {
 
     socket.on("send_message", async (data) => {
         try {
-            const newMessage = await Message.create({ sender: socket.userId, text: data.text });
+            const { receiverId, text } = data;
+            
+            const newMessage = await Message.create({ 
+                sender: socket.userId, 
+                receiver: receiverId,
+                text 
+            });
+            
             const populatedMessage = await newMessage.populate("sender", "username");
-            io.emit("receive_message", populatedMessage);
+            
+            // Send to receiver's room and sender's room
+            io.to(receiverId).to(socket.userId).emit("receive_message", populatedMessage);
         } catch (err) {
-            console.error("Message failed to save. Tragic.", err);
+            console.error("Message failed to save.", err);
         }
     });
 
-    socket.on("typing", (username) => socket.broadcast.emit("user_typing", username));
-    socket.on("stop_typing", (username) => socket.broadcast.emit("user_stop_typing", username));
+    socket.on("typing", ({ receiverId }) => {
+        socket.to(receiverId).emit("user_typing", socket.userId);
+    });
+
+    socket.on("stop_typing", ({ receiverId }) => {
+        socket.to(receiverId).emit("user_stop_typing", socket.userId);
+    });
 
     socket.on("disconnect", async () => {
-        console.log(`Entity disconnected: ${socket.userId}. They escaped.`);
+        console.log(`User disconnected: ${socket.userId}`);
         if (socket.userId) {
             await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen: new Date() });
             io.emit("user_status", { userId: socket.userId, isOnline: false });
