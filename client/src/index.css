@@ -11,6 +11,7 @@
   --accent-gradient: linear-gradient(45deg, #ff416c, #8a2387);
   --bubble-self: #ff416c;
   --bubble-other: #272a30;
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -135,6 +136,20 @@ body {
   background-color: var(--bg-dark);
 }
 
+/* --- Brand Logo Area --- */
+.brand-logo {
+  margin: 0; 
+  font-size: 1.5rem; 
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.brand-logo:hover {
+  opacity: 0.8;
+  transform: scale(0.98);
+}
+
 .chat-header {
   padding: 16px 24px;
   border-bottom: 1px solid var(--border);
@@ -224,6 +239,7 @@ body {
   border-radius: 12px;
   border: 1px solid var(--border);
   align-items: flex-end;
+  transition: border-color 0.2s;
 }
 
 .chat-input-form:focus-within {
@@ -274,7 +290,7 @@ body {
   gap: 14px;
   padding: 14px 20px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, padding-left 0.2s;
   border-left: 3px solid transparent;
 }
 
@@ -285,6 +301,7 @@ body {
 .user-item.active {
   background-color: rgba(255, 65, 108, 0.08);
   border-left-color: var(--accent-main);
+  padding-left: 24px; /* Slight indent for active state */
 }
 
 .avatar {
@@ -348,7 +365,41 @@ body {
   text-overflow: ellipsis;
 }
 
-/* Empty State */
+/* --- New Professional Welcome Panel --- */
+.welcome-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  animation: fadeIn 0.5s ease-out;
+  padding: 20px;
+}
+
+.welcome-panel svg {
+  width: 100px;
+  height: 100px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+  opacity: 0.5;
+}
+
+.welcome-panel h2 {
+  font-size: 1.8rem;
+  color: var(--text-main);
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.welcome-panel p {
+  font-size: 1rem;
+  color: var(--text-muted);
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+/* Empty State (for messages) */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -359,23 +410,42 @@ body {
   text-align: center;
 }
 
-.empty-state svg {
-  width: 64px;
-  height: 64px;
-  margin-bottom: 16px;
-  opacity: 0.5;
+/* --- Profile Section & Drawer Menu --- */
+.profile-section {
+  padding: 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: background 0.2s;
+  position: relative;
 }
 
-.empty-state h3 {
-  font-size: 1.2rem;
-  color: var(--text-main);
-  margin-bottom: 8px;
-  font-weight: 600;
+.profile-section:hover {
+  background: var(--bg-hover);
 }
 
-.empty-state p {
-  font-size: 0.95rem;
-  max-width: 300px;
+.profile-popup-menu {
+  position: absolute;
+  bottom: 80px;
+  left: 20px;
+  width: 300px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  overflow: hidden;
+}
+
+.popup-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
 }
 
 /* Overlays & Utilities */
@@ -438,6 +508,9 @@ body {
   .message-wrapper {
     max-width: 85%;
   }
+  .profile-popup-menu {
+    width: calc(100% - 40px); /* Responsive width on mobile */
+  }
 }
 
 /* --- Modern UX Improvements --- */
@@ -479,11 +552,6 @@ body {
 .typing-dot:nth-child(1) { animation-delay: -0.32s; }
 .typing-dot:nth-child(2) { animation-delay: -0.16s; }
 
-@keyframes typingBounce {
-  0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
-  40% { transform: scale(1); opacity: 1; }
-}
-
 /* --- Toasts --- */
 .toast-container {
   position: fixed;
@@ -508,11 +576,6 @@ body {
 .toast-error { background-color: #ef4444; }
 .toast-success { background-color: #10b981; }
 
-@keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-
 /* --- Unread Badges --- */
 .unread-badge {
   background: var(--accent-main);
@@ -524,7 +587,7 @@ body {
   margin-left: auto;
 }
 
-/* --- Context Menu --- */
+/* --- Context Menus (For messages & Profile) --- */
 .context-menu {
   position: absolute;
   background-color: var(--bg-card);
@@ -532,22 +595,47 @@ body {
   border-radius: 8px;
   padding: 4px 0;
   min-width: 150px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-lg);
   z-index: 1000;
+  animation: fadeIn 0.15s ease-out;
 }
 
 .context-menu-item {
   width: 100%;
   text-align: left;
-  padding: 10px 16px;
+  padding: 12px 16px;
   background: none;
   border: none;
   color: var(--text-main);
   font-size: 0.9rem;
+  font-weight: 500;
   cursor: pointer;
   transition: background 0.2s;
+  display: flex;
+  align-items: center;
 }
 
 .context-menu-item:hover { background-color: var(--bg-hover); }
 .delete-text { color: #ef4444; }
 .delete-text:hover { background-color: rgba(239, 68, 68, 0.1); }
+
+/* --- Animations --- */
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(10px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
