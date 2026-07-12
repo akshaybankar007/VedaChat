@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { Link } from "react-router-dom";
-
 
 const Register = () => {
     const [formData, setFormData] = useState({ username: "", email: "", phone: "", password: "" });
     const { register } = useAuth();
+    const { showToast } = useToast();
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -17,8 +18,8 @@ const Register = () => {
             await register(formData.username, formData.email, formData.phone, formData.password);
         } catch (err) {
             console.error("Register Error:", err);
-            const backendError = err.response?.data?.message || err.message || "Rejection is tough.";
-            alert(`Tragic failure: ${backendError}`);
+            const backendError = err.response?.data?.message || err.message || "Registration failed.";
+            showToast(backendError, "error");
         } finally {
             setLoading(false);
         }
@@ -27,14 +28,14 @@ const Register = () => {
     return (
         <div className="auth-container">
             <div className="auth-box">
-                <h2 className="auth-title">VedaChat </h2>
+                <h2 className="auth-title">VedaChat</h2>
                 <form onSubmit={handleSubmit} className="auth-form">
                     <input className="auth-input" name="username" type="text" placeholder="Username" onChange={handleChange} required />
                     <input className="auth-input" name="email" type="email" placeholder="Email" onChange={handleChange} required />
                     <input className="auth-input" name="phone" type="text" placeholder="Phone" onChange={handleChange} required />
                     <input className="auth-input" name="password" type="password" placeholder="Password" onChange={handleChange} required />
                     <button type="submit" className="auth-btn" disabled={loading}>
-                        {loading ? "Forging Identity..." : "Join the Chat"}
+                        {loading ? "Forging Identity..." : "Sign Up"}
                     </button>
                 </form>
                 <p className="auth-link">
