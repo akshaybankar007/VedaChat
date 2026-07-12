@@ -26,6 +26,8 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         localStorage.clear();
         setUser(null);
+        // Force a reload to sever the websocket connection
+        window.location.href = "/login"; 
     };
 
     return (

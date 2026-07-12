@@ -75,7 +75,6 @@ const Chat = () => {
 
         socket.emit("typing", user.username);
 
-        // Clear existing timeout and set a new one to stop typing after 2 seconds of inactivity
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         
         typingTimeoutRef.current = setTimeout(() => {
@@ -93,23 +92,19 @@ const Chat = () => {
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
 
-    // Modern Dark Theme Palette
+    const formatTime = (dateString) => {
+        if (!dateString) return "";
+        return new Date(dateString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
     const theme = {
-        bgDark: "#12121a",
-        sidebar: "#1c1c26",
-        textLight: "#e2e2ea",
-        textMuted: "#8b8b9e",
-        primary: "#6c5ce7",
-        primaryHover: "#5a4bcf",
-        danger: "#ff4757",
-        bubbleSelf: "#6c5ce7",
-        bubbleOther: "#2d2d3a",
-        inputBg: "#2d2d3a"
+        bgDark: "#12121a", sidebar: "#1c1c26", textLight: "#e2e2ea", 
+        textMuted: "#8b8b9e", primary: "#6c5ce7", danger: "#ff4757", 
+        bubbleSelf: "#6c5ce7", bubbleOther: "#2d2d3a", inputBg: "#2d2d3a"
     };
 
     return (
         <div style={{ display: "flex", height: "100vh", fontFamily: "'Inter', system-ui, sans-serif", backgroundColor: theme.bgDark, color: theme.textLight }}>
-            {/* Sleek Sidebar */}
             <div style={{ width: "260px", backgroundColor: theme.sidebar, padding: "1.5rem", display: "flex", flexDirection: "column", borderRight: `1px solid ${theme.inputBg}` }}>
                 <h3 style={{ margin: "0 0 1.5rem 0", fontSize: "1.2rem", fontWeight: "600", letterSpacing: "1px", color: theme.primary }}>VEDACHAT</h3>
                 <div style={{ fontSize: "0.85rem", color: theme.textMuted, marginBottom: "1rem", textTransform: "uppercase", fontWeight: "bold" }}>Online Network</div>
@@ -128,7 +123,6 @@ const Chat = () => {
                     ))}
                 </ul>
 
-                {/* User Profile Footer */}
                 <div style={{ marginTop: "auto", paddingTop: "1rem", borderTop: `1px solid ${theme.inputBg}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                         <div style={{ width: "36px", height: "36px", borderRadius: "8px", backgroundColor: theme.inputBg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
@@ -140,29 +134,26 @@ const Chat = () => {
                 </div>
             </div>
 
-            {/* Main Chat Area */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-                {/* Header */}
                 <div style={{ padding: "1.5rem", borderBottom: `1px solid ${theme.inputBg}`, backgroundColor: theme.bgDark, display: "flex", alignItems: "center", boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)" }}>
                     <h2 style={{ margin: 0, fontSize: "1.2rem", fontWeight: "600" }}># the-abyss</h2>
                 </div>
 
-                {/* Messages Container */}
                 <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
                     {messages.map((msg, index) => {
                         const isSelf = msg.sender?._id === user.id;
                         return (
                             <div key={index} style={{ alignSelf: isSelf ? "flex-end" : "flex-start", maxWidth: "65%", display: "flex", flexDirection: "column", alignItems: isSelf ? "flex-end" : "flex-start" }}>
-                                {!isSelf && <span style={{ fontSize: "0.75rem", color: theme.textMuted, marginBottom: "4px", marginLeft: "4px" }}>{msg.sender?.username || "Unknown Entity"}</span>}
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", marginLeft: "4px", marginRight: "4px" }}>
+                                    {!isSelf && <span style={{ fontSize: "0.75rem", color: theme.textMuted }}>{msg.sender?.username || "Unknown Entity"}</span>}
+                                    <span style={{ fontSize: "0.65rem", color: theme.textMuted }}>{formatTime(msg.createdAt)}</span>
+                                </div>
                                 <div style={{ 
                                     background: isSelf ? theme.bubbleSelf : theme.bubbleOther, 
-                                    color: "white", 
-                                    padding: "10px 14px", 
-                                    borderRadius: "16px", 
+                                    color: "white", padding: "10px 14px", borderRadius: "16px", 
                                     borderBottomRightRadius: isSelf ? "4px" : "16px", 
                                     borderBottomLeftRadius: isSelf ? "16px" : "4px", 
-                                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)", 
-                                    lineHeight: "1.4" 
+                                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)", lineHeight: "1.4" 
                                 }}>
                                     {msg.text}
                                 </div>
@@ -170,7 +161,6 @@ const Chat = () => {
                         );
                     })}
                     
-                    {/* Live Typing Indicator */}
                     {typingUsers.length > 0 && (
                         <div style={{ alignSelf: "flex-start", color: theme.textMuted, fontSize: "0.85rem", fontStyle: "italic", paddingLeft: "4px" }}>
                             {typingUsers.join(", ")} {typingUsers.length === 1 ? "is" : "are"} typing...
@@ -179,22 +169,14 @@ const Chat = () => {
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input Area */}
                 <div style={{ padding: "0 1.5rem 1.5rem 1.5rem" }}>
                     <form onSubmit={handleSend} style={{ display: "flex", gap: "10px", backgroundColor: theme.inputBg, padding: "8px", borderRadius: "8px" }}>
                         <input
-                            type="text"
-                            value={newMessage}
-                            onChange={handleInputChange}
+                            type="text" value={newMessage} onChange={handleInputChange}
                             placeholder={`Message #the-abyss`}
                             style={{ flex: 1, padding: "12px", borderRadius: "6px", border: "none", backgroundColor: "transparent", color: "white", outline: "none", fontSize: "1rem" }}
                         />
-                        <button 
-                            type="submit" 
-                            style={{ padding: "10px 24px", background: theme.primary, color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "600", transition: "0.2s" }}
-                        >
-                            Send
-                        </button>
+                        <button type="submit" style={{ padding: "10px 24px", background: theme.primary, color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "600", transition: "0.2s" }}>Send</button>
                     </form>
                 </div>
             </div>
