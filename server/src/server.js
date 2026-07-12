@@ -6,6 +6,7 @@ import { Server } from "socket.io";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 import Message from "./models/Message.js";
 import User from "./models/User.js";
 
@@ -31,6 +32,7 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/users", userRoutes);
 
 app.get("/", (req, res) => {
     res.status(200).json({
@@ -42,14 +44,12 @@ app.get("/", (req, res) => {
 io.on("connection", (socket) => {
     console.log(`User connected: ${socket.id}. Let's see how long before they break something.`);
 
-    // Map the socket to a user and mark them online
     socket.on("user_join", async (userId) => {
         socket.userId = userId;
         await User.findByIdAndUpdate(userId, { isOnline: true });
         io.emit("user_status", { userId, isOnline: true });
     });
 
-    // Save message to DB and broadcast to everyone
     socket.on("send_message", async (data) => {
         try {
             const newMessage = await Message.create({ sender: data.senderId, text: data.text });
