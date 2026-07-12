@@ -2,19 +2,29 @@ import Message from "../models/Message.js";
 
 export const getMessages = async (req, res, next) => {
     try {
+        const { userId: otherUserId } = req.params;
+        const currentUserId = req.user.id;
+        
         const limit = parseInt(req.query.limit) || 50;
         const cursor = req.query.cursor; 
 
-        let query = {};
+        let query = {
+            $or: [
+                { sender: currentUserId, receiver: otherUserId },
+                { sender: otherUserId, receiver: currentUserId }
+            ]
+        };
+
         if (cursor) {
             const lastMessage = await Message.findById(cursor);
             if (lastMessage) {
-                query = { createdAt: { $lt: lastMessage.createdAt } };
+                query.createdAt = { $lt: lastMessage.createdAt };
             }
         }
 
         const messages = await Message.find(query)
             .populate("sender", "username")
+            .populate("receiver", "username")
             .sort({ createdAt: -1 }) 
             .limit(limit);
             
