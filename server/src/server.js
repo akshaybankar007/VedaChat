@@ -36,9 +36,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/users", userRoutes);
 
-app.get("/", (req, res) => {
-    res.status(200).json({ success: true, message: "VEDACHAT Backend Running 🚀" });
-});
+app.get("/", (req, res) => res.status(200).json({ success: true, message: "VEDACHAT Backend Running 🚀" }));
 
 app.use(errorHandler);
 
@@ -56,9 +54,6 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
-    console.log(`User connected: ${socket.userId}`);
-    
-    // Join a personal room for private messaging
     socket.join(socket.userId);
 
     socket.on("user_join", async () => {
@@ -69,32 +64,40 @@ io.on("connection", (socket) => {
     socket.on("send_message", async (data) => {
         try {
             const { receiverId, text } = data;
-            
-            const newMessage = await Message.create({ 
-                sender: socket.userId, 
-                receiver: receiverId,
-                text 
-            });
-            
+            const newMessage = await Message.create({ sender: socket.userId, receiver: receiverId, text });
             const populatedMessage = await newMessage.populate("sender", "username");
             
-            // Send to receiver's room and sender's room
             io.to(receiverId).to(socket.userId).emit("receive_message", populatedMessage);
         } catch (err) {
             console.error("Message failed to save.", err);
         }
     });
 
-    socket.on("typing", ({ receiverId }) => {
-        socket.to(receiverId).emit("user_typing", socket.userId);
+    // Mark messages as read
+    socket.on("mark_read", async ({ senderId }) => {
+        await Message.updateMany(
+            { sender: senderId, receiver: socket.userId, isRead: false },
+            { isRead: true }
+        );
+        io.to(senderId).emit("messages_read", { readerId: socket.userId });
     });
 
-    socket.on("stop_typing", ({ receiverId }) => {
-        socket.to(receiverId).emit("user_stop_typing", socket.userId);
+    // Delete message
+    socket.on("delete_message", async ({ messageId, receiverId }) => {
+        try {
+            const msg = await Message.findOneAndDelete({ _id: messageId, sender: socket.userId });
+            if (msg) {
+                io.to(receiverId).to(socket.userId).emit("message_deleted", messageId);
+            }
+        } catch (err) {
+            console.error("Delete failed.", err);
+        }
     });
+
+    socket.on("typing", ({ receiverId }) => socket.to(receiverId).emit("user_typing", socket.userId));
+    socket.on("stop_typing", ({ receiverId }) => socket.to(receiverId).emit("user_stop_typing", socket.userId));
 
     socket.on("disconnect", async () => {
-        console.log(`User disconnected: ${socket.userId}`);
         if (socket.userId) {
             await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen: new Date() });
             io.emit("user_status", { userId: socket.userId, isOnline: false });
@@ -103,7 +106,4 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 5000;
-
-server.listen(PORT, () => {
-    console.log(`Server surviving on http://localhost:${PORT}`);
-});
+server.listen(PORT, () => console.log(`Server surviving on http://localhost:${PORT}`));

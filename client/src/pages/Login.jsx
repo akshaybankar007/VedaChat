@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { Link } from "react-router-dom";
 
 const Login = () => {
     const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
     const { login } = useAuth();
+    const { showToast } = useToast();
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e) => {
@@ -14,9 +16,8 @@ const Login = () => {
         try {
             await login(identifier, password);
         } catch (err) {
-            console.error("Login Error:", err);
-            const backendError = err.response?.data?.message || err.message || "Heartbreak. Authentication failed.";
-            alert(`Access Denied: ${backendError}`);
+            const backendError = err.response?.data?.message || err.message || "Authentication failed.";
+            showToast(backendError, "error");
         } finally {
             setLoading(false);
         }
@@ -25,26 +26,12 @@ const Login = () => {
     return (
         <div className="auth-container">
             <div className="auth-box">
-                <h2 className="auth-title">VedaChat 💌</h2>
+                <h2 className="auth-title">VedaChat</h2>
                 <form onSubmit={handleSubmit} className="auth-form">
-                    <input 
-                        className="auth-input"
-                        type="text" 
-                        placeholder="Username, Email, or Phone" 
-                        value={identifier} 
-                        onChange={(e) => setIdentifier(e.target.value)} 
-                        required 
-                    />
-                    <input 
-                        className="auth-input"
-                        type="password" 
-                        placeholder="Password" 
-                        value={password} 
-                        onChange={(e) => setPassword(e.target.value)} 
-                        required 
-                    />
+                    <input className="auth-input" type="text" placeholder="Username, Email, or Phone" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
+                    <input className="auth-input" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
                     <button type="submit" className="auth-btn" disabled={loading}>
-                        {loading ? "Connecting Hearts..." : "Log In 💖"}
+                        {loading ? "Connecting..." : "Log In"}
                     </button>
                 </form>
                 <p className="auth-link">
@@ -54,5 +41,4 @@ const Login = () => {
         </div>
     );
 };
-
 export default Login;

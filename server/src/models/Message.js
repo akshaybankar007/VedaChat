@@ -16,8 +16,16 @@ const messageSchema = new mongoose.Schema(
             type: String, 
             required: true 
         },
+        isRead: {
+            type: Boolean,
+            default: false
+        }
     },
     { timestamps: true }
 );
+
+
+messageSchema.index({ sender: 1, receiver: 1, createdAt: -1 });
+messageSchema.index({ isRead: 1 });
 
 export default mongoose.model("Message", messageSchema);

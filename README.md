@@ -3,8 +3,8 @@
 A real-time, full-stack chat application built to demonstrate seamless websockets integration, secure authentication, and scalable MERN architecture. 
 
 ## 🚀 Live Demo & Proof of Concept
-- **Frontend (Vercel):** [\[Insert your Vercel URL here\]](https://veda-chat.vercel.app)
-- **Backend (Render):** [\[Insert your Render URL here\]](https://vedachat.onrender.com)
+- **Frontend (Vercel):** [https://veda-chat.vercel.app](https://veda-chat.vercel.app)
+- **Backend (Render):** [https://vedachat.onrender.com](https://vedachat.onrender.com)
 - **Video Walkthrough:** [Coming soon]
 
 ## ✨ Features

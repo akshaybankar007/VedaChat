@@ -1,5 +1,6 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
+import { useToast } from "./ToastContext";
 
 const AuthContext = createContext();
 
@@ -8,7 +9,29 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(JSON.parse(localStorage.getItem("user")) || null);
+    const { showToast } = useToast();
     const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+    const logout = () => {
+        localStorage.clear();
+        setUser(null);
+        window.location.href = "/login"; 
+    };
+
+    // Axios Interceptor to catch 401 Unauthorized globally
+    useEffect(() => {
+        const interceptor = axios.interceptors.response.use(
+            response => response,
+            error => {
+                if (error.response?.status === 401) {
+                    showToast("Session expired. Please log in again.", "error");
+                    logout();
+                }
+                return Promise.reject(error);
+            }
+        );
+        return () => axios.interceptors.response.eject(interceptor);
+    }, [showToast]);
 
     const login = async (identifier, password) => {
         const { data } = await axios.post(`${API_URL}/api/auth/login`, { identifier, password });
@@ -22,12 +45,6 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem("user", JSON.stringify(data.user));
         localStorage.setItem("token", data.token);
         setUser(data.user);
-    };
-
-    const logout = () => {
-        localStorage.clear();
-        setUser(null);
-        window.location.href = "/login"; 
     };
 
     return (
