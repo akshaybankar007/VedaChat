@@ -17,6 +17,10 @@ const Chat = () => {
     const [hasMore, setHasMore] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [contextMenu, setContextMenu] = useState(null);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
+    
+    // Theme Management State
+    const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
     
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
@@ -24,14 +28,26 @@ const Chat = () => {
     const textareaRef = useRef(null);
     const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-    // HOISTED HELPER: Placed before useEffects so it can be called safely
     const scrollToBottom = (behavior = "smooth") => {
         messagesEndRef.current?.scrollIntoView({ behavior });
     };
 
-    // Close context menu on any outside click
+    // Apply and persist Theme
     useEffect(() => {
-        const handleClick = () => setContextMenu(null);
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+    }, [theme]);
+
+    const toggleTheme = () => {
+        setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+    };
+
+    // Close menus on outside click
+    useEffect(() => {
+        const handleClick = () => {
+            setContextMenu(null);
+            setShowProfileMenu(false);
+        };
         window.addEventListener("click", handleClick);
         return () => window.removeEventListener("click", handleClick);
     }, []);
@@ -53,7 +69,7 @@ const Chat = () => {
         fetchUsers();
     }, [API_URL, showToast]);
 
-    // Fetch messages & clear unread counts when a user is selected
+    // Fetch messages
     useEffect(() => {
         if (!selectedUser) return;
         
@@ -67,7 +83,6 @@ const Chat = () => {
                 setHasMore(data.messages.length === 50);
                 setIsTyping(false);
                 
-                // Clear unread count locally and inform server
                 setUsers(prev => prev.map(u => u._id === selectedUser._id ? { ...u, unreadCount: 0 } : u));
                 if (socket) socket.emit("mark_read", { senderId: selectedUser._id });
 
@@ -86,7 +101,6 @@ const Chat = () => {
         socket.emit("user_join");
 
         const handleReceive = (message) => {
-            // If message is for the currently open chat
             if (selectedUser && (message.sender._id === selectedUser._id || message.sender._id === user.id)) {
                 setMessages((prev) => {
                     const newMessages = [...prev, message];
@@ -99,11 +113,9 @@ const Chat = () => {
                     }
                     return newMessages;
                 });
-                // Mark as read immediately if chat is open
                 if (message.sender._id !== user.id) socket.emit("mark_read", { senderId: message.sender._id });
             }
             
-            // Update Sidebar
             setUsers((prev) => prev.map((u) => {
                 const isRelevant = u._id === message.sender._id || (message.sender._id === user.id && u._id === message.receiver);
                 if (isRelevant) {
@@ -119,25 +131,13 @@ const Chat = () => {
             }).sort((a, b) => new Date(b.lastMessageTime || 0) - new Date(a.lastMessageTime || 0)));
         };
 
-        const handleDeleted = (msgId) => {
-            setMessages(prev => prev.filter(m => m._id !== msgId));
-        };
-
+        const handleDeleted = (msgId) => setMessages(prev => prev.filter(m => m._id !== msgId));
         const handleUserStatus = ({ userId, isOnline }) => {
             setUsers((prev) => prev.map((u) => u._id === userId ? { ...u, isOnline } : u));
             if (selectedUser && selectedUser._id === userId) setSelectedUser(prev => ({ ...prev, isOnline }));
         };
-
-        const handleTyping = (senderId) => {
-            if (selectedUser && selectedUser._id === senderId) {
-                setIsTyping(true);
-                setTimeout(() => scrollToBottom("smooth"), 50);
-            }
-        };
-
-        const handleStopTyping = (senderId) => {
-            if (selectedUser && selectedUser._id === senderId) setIsTyping(false);
-        };
+        const handleTyping = (senderId) => { if (selectedUser && selectedUser._id === senderId) { setIsTyping(true); setTimeout(() => scrollToBottom("smooth"), 50); }};
+        const handleStopTyping = (senderId) => { if (selectedUser && selectedUser._id === senderId) setIsTyping(false); };
 
         socket.on("receive_message", handleReceive);
         socket.on("message_deleted", handleDeleted);
@@ -164,7 +164,7 @@ const Chat = () => {
             if (data.messages.length < 50) setHasMore(false);
             setMessages((prev) => [...data.messages, ...prev]);
         } catch (err) {
-            console.error("Pagination failed:", err);
+            console.error("Pagination error:", err); // Used the err variable
             showToast("Pagination failed.", "error");
         }
     };
@@ -207,13 +207,9 @@ const Chat = () => {
         if (!dateString) return "";
         const date = new Date(dateString);
         const now = new Date();
-        
         const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-        
-        const yesterday = new Date(now);
-        yesterday.setDate(now.getDate() - 1);
+        const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
         const isYesterday = date.getDate() === yesterday.getDate() && date.getMonth() === yesterday.getMonth() && date.getFullYear() === yesterday.getFullYear();
-        
         const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
         if (isToday) return timeString;
@@ -228,7 +224,13 @@ const Chat = () => {
             {/* Sidebar */}
             <div className={`chat-sidebar ${sidebarOpen ? 'open' : ''}`}>
                 <div style={{ padding: "24px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <h3 style={{ margin: 0, fontSize: "1.5rem", fontWeight: "700" }}>VedaChat</h3>
+                    <h3 
+                        className="brand-logo" 
+                        onClick={() => { setSelectedUser(null); setSidebarOpen(false); }}
+                        title="Return to Home"
+                    >
+                        VedaChat
+                    </h3>
                 </div>
                 
                 <div style={{ flex: 1, overflowY: "auto" }}>
@@ -247,20 +249,56 @@ const Chat = () => {
                                     {u.lastMessage ? u.lastMessage : <span style={{ fontStyle: "italic", opacity: 0.6 }}>No messages yet</span>}
                                 </div>
                             </div>
-                            {/* Unread Badge */}
-                            {u.unreadCount > 0 && (
-                                <div className="unread-badge">{u.unreadCount}</div>
-                            )}
+                            {u.unreadCount > 0 && <div className="unread-badge">{u.unreadCount}</div>}
                         </div>
                     ))}
                 </div>
 
-                <div style={{ padding: "20px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--bg-dark)" }}>
+                {/* Profile Section & Popup Menu */}
+                <div 
+                    className="profile-section" 
+                    onClick={(e) => { e.stopPropagation(); setShowProfileMenu(!showProfileMenu); }}
+                >
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <div className="avatar" style={{ width: "36px", height: "36px", fontSize: "0.9rem" }}>{user?.username.charAt(0).toUpperCase()}</div>
-                        <span style={{ fontWeight: "600", fontSize: "0.9rem" }}>{user?.username}</span>
+                        <div className="avatar" style={{ width: "36px", height: "36px", fontSize: "0.9rem" }}>
+                            {user?.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                            <span style={{ fontWeight: "600", fontSize: "0.9rem" }}>{user?.username}</span>
+                            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>My Account</span>
+                        </div>
                     </div>
-                    <button onClick={logout} style={{ background: "transparent", color: "var(--text-muted)", border: "none", cursor: "pointer", fontSize: "0.85rem", fontWeight: "500" }}>Log Out</button>
+                    
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showProfileMenu ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
+                        <polyline points="18 15 12 9 6 15"></polyline>
+                    </svg>
+
+                    {showProfileMenu && (
+                        <div className="profile-popup-menu" onClick={(e) => e.stopPropagation()}>
+                            <div className="popup-header">
+                                <span style={{ fontWeight: "700", fontSize: "1rem" }}>{user?.username}</span>
+                                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "4px" }}>{user?.email}</span>
+                            </div>
+                            
+                            <button className="context-menu-item" onClick={() => showToast("Profile editing coming soon!", "success")}>
+                                <span style={{ marginRight: '12px', fontSize: '1.1rem' }}>👤</span> Edit Profile
+                            </button>
+
+                            {/* Replaced Settings with the Theme Toggle */}
+                            <button className="context-menu-item" onClick={toggleTheme}>
+                                <span style={{ marginRight: '12px', fontSize: '1.1rem' }}>
+                                    {theme === 'dark' ? '☀️' : '🌙'}
+                                </span> 
+                                {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                            </button>
+                            
+                            <div style={{ borderTop: "1px solid var(--border)", margin: "4px 0" }}></div>
+                            
+                            <button className="context-menu-item delete-text" onClick={logout}>
+                                <span style={{ marginRight: '12px', fontSize: '1.1rem' }}>🚪</span> Log Out
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -348,12 +386,14 @@ const Chat = () => {
                         </div>
                     </>
                 ) : (
-                    <div className="chat-main" style={{ alignItems: "center", justifyContent: "center", display: "flex", flexDirection: "column" }}>
-                        <button className="mobile-menu-btn" style={{ position: "absolute", top: "20px", left: "20px" }} onClick={() => setSidebarOpen(true)}>☰</button>
-                        <div className="empty-state">
-                            <h3>Welcome to VedaChat</h3>
-                            <p>Select a user from the sidebar to start a private conversation.</p>
-                        </div>
+                    <div className="welcome-panel">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                        </svg>
+                        <h2>Welcome to VedaChat</h2>
+                        <p>
+                            Connect, collaborate, and chat in real-time. Select a user from the sidebar to start a conversation, or adjust your settings in the profile menu.
+                        </p>
                     </div>
                 )}
             </div>

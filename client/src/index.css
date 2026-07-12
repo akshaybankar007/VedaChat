@@ -14,6 +14,20 @@
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
 }
 
+[data-theme="light"] {
+  --bg-dark: #f3f4f6;
+  --bg-card: #ffffff;
+  --bg-hover: #f8fafc;
+  --text-main: #111827;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --accent-main: #ff416c;
+  --accent-gradient: linear-gradient(45deg, #ff416c, #8a2387);
+  --bubble-self: #ff416c;
+  --bubble-other: #e2e8f0;
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -26,6 +40,7 @@ body {
   color: var(--text-main);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* --- Auth Pages --- */
@@ -36,6 +51,7 @@ body {
   min-height: 100vh;
   padding: 20px;
   background: var(--bg-dark);
+  transition: background-color 0.3s ease;
 }
 
 .auth-box {
@@ -47,6 +63,7 @@ body {
   max-width: 400px;
   text-align: center;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .auth-title {
@@ -116,6 +133,7 @@ body {
   height: 100vh;
   background-color: var(--bg-dark);
   overflow: hidden;
+  transition: background-color 0.3s ease;
 }
 
 .chat-sidebar {
@@ -124,7 +142,7 @@ body {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
   z-index: 10;
 }
 
@@ -134,6 +152,7 @@ body {
   flex-direction: column;
   position: relative;
   background-color: var(--bg-dark);
+  transition: background-color 0.3s ease;
 }
 
 /* --- Brand Logo Area --- */
@@ -157,6 +176,7 @@ body {
   align-items: center;
   background-color: var(--bg-card);
   min-height: 70px;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .mobile-menu-btn {
@@ -202,6 +222,7 @@ body {
   line-height: 1.5;
   word-wrap: break-word;
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .bubble-self {
@@ -229,6 +250,7 @@ body {
   padding: 16px 24px;
   background-color: var(--bg-card);
   border-top: 1px solid var(--border);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .chat-input-form {
@@ -239,7 +261,7 @@ body {
   border-radius: 12px;
   border: 1px solid var(--border);
   align-items: flex-end;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background-color 0.3s ease;
 }
 
 .chat-input-form:focus-within {
@@ -301,7 +323,7 @@ body {
 .user-item.active {
   background-color: rgba(255, 65, 108, 0.08);
   border-left-color: var(--accent-main);
-  padding-left: 24px; /* Slight indent for active state */
+  padding-left: 24px;
 }
 
 .avatar {
@@ -327,6 +349,7 @@ body {
   height: 13px;
   border-radius: 50%;
   border: 2px solid var(--bg-card);
+  transition: border-color 0.3s ease;
 }
 
 .status-online { background-color: #10b981; }
@@ -419,7 +442,7 @@ body {
   justify-content: space-between;
   background: var(--bg-card);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, border-color 0.3s ease;
   position: relative;
 }
 
@@ -439,6 +462,7 @@ body {
   z-index: 100;
   animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   overflow: hidden;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .popup-header {
@@ -509,7 +533,7 @@ body {
     max-width: 85%;
   }
   .profile-popup-menu {
-    width: calc(100% - 40px); /* Responsive width on mobile */
+    width: calc(100% - 40px);
   }
 }
 
@@ -530,6 +554,7 @@ body {
   border-radius: 12px;
   font-weight: 500;
   border: 1px solid var(--border);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 /* Typing Indicator Animation */
@@ -587,7 +612,7 @@ body {
   margin-left: auto;
 }
 
-/* --- Context Menus (For messages & Profile) --- */
+/* --- Context Menus --- */
 .context-menu {
   position: absolute;
   background-color: var(--bg-card);
@@ -598,6 +623,7 @@ body {
   box-shadow: var(--shadow-lg);
   z-index: 1000;
   animation: fadeIn 0.15s ease-out;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .context-menu-item {
