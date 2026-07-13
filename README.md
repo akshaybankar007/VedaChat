@@ -1,8 +1,3 @@
-Here’s the final, polished README content exactly as you wrote it, with consistent Markdown formatting:
-
----
-
-```markdown
 # VedaChat
 
 A production-ready, real-time 1-on-1 chat application demonstrating scalable MERN architecture, secure WebSockets, and modern UX design.
@@ -85,6 +80,3 @@ Open `http://localhost:5173` in your browser. Create two separate accounts (use 
 **Akshay Bankar**
 - GitHub: [@akshaybankar007](https://github.com/akshaybankar007)
 - LinkedIn: [Akshay Bankar](https://www.linkedin.com/in/akshay--bankar)
-```
-
----
