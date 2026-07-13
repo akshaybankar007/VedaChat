@@ -1,6 +1,11 @@
+Here’s the final, polished README content exactly as you wrote it, with consistent Markdown formatting:
+
+---
+
+```markdown
 # VedaChat
 
-A production-ready, real-time 1-on-1 chat application demonstrating scalable MERN architecture, secure WebSockets, and modern UX design. 
+A production-ready, real-time 1-on-1 chat application demonstrating scalable MERN architecture, secure WebSockets, and modern UX design.
 
 ## 🚀 Live Demo
 - **Frontend (Vercel):** [https://veda-chat.vercel.app](https://veda-chat.vercel.app)
@@ -33,45 +38,45 @@ A production-ready, real-time 1-on-1 chat application demonstrating scalable MER
 ## ⚙️ Local Development Setup
 
 ### 1. Clone the Repository
-\`\`\`bash
+```bash
 git clone https://github.com/akshaybankar007/VedaChat.git
 cd VedaChat
-\`\`\`
+```
 
 ### 2. Backend Setup
 Open a terminal and navigate to the backend directory (if separated, or root if combined). Install dependencies:
-\`\`\`bash
+```bash
 npm install
-\`\`\`
+```
 
 Create a `.env` file in the backend root directory and add the following:
-\`\`\`env
+```env
 PORT=5000
 MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_super_secret_jwt_key
 CLIENT_URL=http://localhost:5173
-\`\`\`
+```
 
 Start the backend server:
-\`\`\`bash
+```bash
 npm run dev
-\`\`\`
+```
 
 ### 3. Frontend Setup
 Open a new terminal, navigate to your frontend directory (e.g., `client` or `src` depending on your structure), and install dependencies:
-\`\`\`bash
+```bash
 npm install
-\`\`\`
+```
 
 Create a `.env` file in the frontend root directory:
-\`\`\`env
+```env
 VITE_API_URL=http://localhost:5000
-\`\`\`
+```
 
 Start the Vite development server:
-\`\`\`bash
+```bash
 npm run dev
-\`\`\`
+```
 
 ### 4. Usage
 Open `http://localhost:5173` in your browser. Create two separate accounts (use incognito for the second one) and start chatting.
@@ -80,3 +85,6 @@ Open `http://localhost:5173` in your browser. Create two separate accounts (use 
 **Akshay Bankar**
 - GitHub: [@akshaybankar007](https://github.com/akshaybankar007)
 - LinkedIn: [Akshay Bankar](https://www.linkedin.com/in/akshay--bankar)
+```
+
+---
