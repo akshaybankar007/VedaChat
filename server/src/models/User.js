@@ -15,18 +15,20 @@ const userSchema = new mongoose.Schema({
       sparse: true,
       lowercase: true,
       trim: true,
+      match: [/^\S+@\S+\.\S+$/, "Please use a valid email address"]
     },
     phone: {
       type: String,
       unique: true,
       sparse: true,
       trim: true,
+      match: [/^\d{10,15}$/, "Please use a valid phone number (10-15 digits)"]
     },
     password: {
       type: String,
       required: [true, "Password is required"],
-      minlength: [6, "Password must be at least 6 characters long"], // Critical 3: Stop "" passwords
-      select: false, // Critical 2: Prevent password hash leaks in arbitrary reads
+      minlength: [6, "Password must be at least 6 characters long"], // Stop "" passwords
+      select: false, // Prevent password hash leaks in arbitrary reads
     },
     isOnline: {
       type: Boolean,
