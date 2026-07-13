@@ -30,10 +30,10 @@ const Register = () => {
             <div className="auth-box">
                 <h2 className="auth-title">VedaChat</h2>
                 <form onSubmit={handleSubmit} className="auth-form">
-                    <input className="auth-input" name="username" type="text" placeholder="Username" onChange={handleChange} required />
+                    <input className="auth-input" name="username" type="text" placeholder="Username" onChange={handleChange} minLength={3} maxLength={20} required />
                     <input className="auth-input" name="email" type="email" placeholder="Email (Optional)" onChange={handleChange} />
-                    <input className="auth-input" name="phone" type="text" placeholder="Phone (Optional)" onChange={handleChange} />
-                    <input className="auth-input" name="password" type="password" placeholder="Password" onChange={handleChange} required />
+                    <input className="auth-input" name="phone" type="tel" placeholder="Phone (10-15 digits)" onChange={handleChange} pattern="^\d{10,15}$" title="10-15 digits only" />
+                    <input className="auth-input" name="password" type="password" placeholder="Password" onChange={handleChange} minLength={6} required />
                     <button type="submit" className="auth-btn" disabled={loading}>
                         {loading ? "Forging Identity..." : "Sign Up"}
                     </button>

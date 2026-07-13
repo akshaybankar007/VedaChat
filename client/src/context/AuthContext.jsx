@@ -4,23 +4,39 @@ import { useToast } from "./ToastContext";
 
 const AuthContext = createContext();
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(JSON.parse(localStorage.getItem("user")) || null);
+    const [user, setUser] = useState(() => {
+        try {
+            const saved = localStorage.getItem("user");
+            return saved ? JSON.parse(saved) : null;
+        } catch (err) {
+            return null;
+        }
+    });
+    
     const { showToast } = useToast();
     const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
     const logout = () => {
-        localStorage.clear();
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
         setUser(null);
-        window.location.href = "/login"; 
+        // App.jsx will natively handle redirecting to /login via React Router SPA functionality
     };
 
-    // Axios Interceptor to catch 401 Unauthorized globally
+    // Axios Interceptors for Auth Headers & 401 Handling
     useEffect(() => {
-        const interceptor = axios.interceptors.response.use(
+        const reqInterceptor = axios.interceptors.request.use(config => {
+            const token = localStorage.getItem("token");
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
+            return config;
+        });
+
+        const resInterceptor = axios.interceptors.response.use(
             response => response,
             error => {
                 if (error.response?.status === 401) {
@@ -30,7 +46,11 @@ export const AuthProvider = ({ children }) => {
                 return Promise.reject(error);
             }
         );
-        return () => axios.interceptors.response.eject(interceptor);
+        
+        return () => {
+            axios.interceptors.request.eject(reqInterceptor);
+            axios.interceptors.response.eject(resInterceptor);
+        };
     }, [showToast]);
 
     const login = async (identifier, password) => {

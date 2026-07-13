@@ -14,13 +14,11 @@ import { errorHandler } from "./middleware/errorMiddleware.js";
 
 dotenv.config();
 
-//Process level handlers
 process.on('uncaughtException', (err) => {
     console.error('UNCAUGHT EXCEPTION! Shutting down...', err);
     process.exit(1);
 });
 
-// Environment variable startup check
 if (!process.env.JWT_SECRET || !process.env.MONGO_URI) {
     console.error("FATAL ERROR: JWT_SECRET or MONGO_URI is not defined.");
     process.exit(1);
@@ -31,7 +29,6 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Unified CORS definition
 const CORS_ORIGIN = process.env.CLIENT_URL || "http://localhost:5173";
 
 const io = new Server(server, {
@@ -56,7 +53,6 @@ app.use("/api/users", userRoutes);
 
 app.get("/", (req, res) => res.status(200).json({ success: true, message: "VEDACHAT Backend Running 🚀" }));
 
-//Catch-all 404 router before global error handler
 app.use((req, res, next) => {
     const err = new Error(`Route ${req.originalUrl} not found`);
     err.statusCode = 404;
@@ -82,7 +78,7 @@ io.on("connection", (socket) => {
     socket.join(socket.userId);
 
     socket.on("user_join", async () => {
-        try { // Critical 1: Try/Catch wrapper
+        try {
             await User.findByIdAndUpdate(socket.userId, { isOnline: true });
             io.emit("user_status", { userId: socket.userId, isOnline: true });
         } catch (err) {
@@ -94,9 +90,8 @@ io.on("connection", (socket) => {
         try {
             const { receiverId, text } = data;
             
-            // Payload validation
             if (!receiverId || !text || typeof text !== 'string' || text.trim() === '') {
-                return socket.emit("message_error", { message: "Invalid message payload" }); // Logic 9: Failure feedback
+                return socket.emit("message_error", { message: "Invalid message payload" });
             }
             
             const newMessage = await Message.create({ sender: socket.userId, receiver: receiverId, text: text.trim() });
@@ -145,9 +140,9 @@ io.on("connection", (socket) => {
     socket.on("disconnect", async () => {
         try {
             if (socket.userId) {
-                // Critical 4: Presence Tracking Connection Reference Count
-                const matchingSockets = await io.in(socket.userId).fetchSockets();
-                const isDisconnected = matchingSockets.length === 0;
+                // Synchronous atomic verification using the adapter prevents concurrent disconnect races
+                const room = io.sockets.adapter.rooms.get(socket.userId);
+                const isDisconnected = !room || room.size === 0;
 
                 if (isDisconnected) {
                     await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen: new Date() });
@@ -163,7 +158,26 @@ io.on("connection", (socket) => {
 const PORT = process.env.PORT || 5000;
 const serverInstance = server.listen(PORT, () => console.log(`Server surviving on http://localhost:${PORT}`));
 
-//Unhandled Promise Rejections process shutdown
+// Graceful shutdowns
+const gracefulShutdown = () => {
+    console.log('SIGTERM/SIGINT received. Shutting down gracefully...');
+    io.close(() => {
+        console.log('Socket.IO closed.');
+        serverInstance.close(() => {
+            console.log('HTTP server closed.');
+            import("mongoose").then(mongoose => {
+                mongoose.default.connection.close(false).then(() => {
+                    console.log('MongoDB connection closed.');
+                    process.exit(0);
+                });
+            });
+        });
+    });
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
 process.on('unhandledRejection', (err) => {
     console.error('UNHANDLED REJECTION! Shutting down...', err);
     serverInstance.close(() => process.exit(1));

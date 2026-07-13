@@ -30,7 +30,7 @@ const Login = () => {
                 <h2 className="auth-title">VedaChat</h2>
                 <form onSubmit={handleSubmit} className="auth-form">
                     <input className="auth-input" name="identifier" type="text" placeholder="Username, Email, or Phone" onChange={handleChange} required />
-                    <input className="auth-input" name="password" type="password" placeholder="Password" onChange={handleChange} required />
+                    <input className="auth-input" name="password" type="password" placeholder="Password" onChange={handleChange} minLength={6} required />
                     <button type="submit" className="auth-btn" disabled={loading}>
                         {loading ? "Connecting..." : "Log In"}
                     </button>

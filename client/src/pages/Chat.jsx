@@ -9,7 +9,6 @@ const Chat = () => {
     const socket = useSocket();
     const { showToast } = useToast();
     
-    // Abstract the current user ID to safely handle both _id and id mapping variations
     const currentUserId = user?._id || user?.id;
     
     const [messages, setMessages] = useState([]);
@@ -18,6 +17,7 @@ const Chat = () => {
     const [newMessage, setNewMessage] = useState("");
     const [isTyping, setIsTyping] = useState(false);
     const [hasMore, setHasMore] = useState(false);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [contextMenu, setContextMenu] = useState(null);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -27,8 +27,10 @@ const Chat = () => {
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
     const typingTimeoutRef = useRef(null);
-    const myTypingRef = useRef(false); // Controls local emit spam
+    const remoteTypingTimeoutRef = useRef(null);
+    const myTypingRef = useRef(false);
     const textareaRef = useRef(null);
+    const lastSentRef = useRef("");
     const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
     const scrollToBottom = (behavior = "smooth") => {
@@ -53,52 +55,72 @@ const Chat = () => {
         return () => window.removeEventListener("click", handleClick);
     }, []);
 
-    // Fetch initial users (Auth headers handled globally now)
+    // Cleanup typing states when switching conversations or unmounting
+    useEffect(() => {
+        return () => {
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            if (remoteTypingTimeoutRef.current) clearTimeout(remoteTypingTimeoutRef.current);
+            if (myTypingRef.current && socket && selectedUser) {
+                socket.emit("stop_typing", { receiverId: selectedUser._id });
+            }
+            myTypingRef.current = false;
+        };
+    }, [selectedUser, socket]);
+
     useEffect(() => {
         const fetchUsers = async () => {
             try {
                 const { data } = await axios.get(`${API_URL}/api/users`);
                 setUsers(data.users);
             } catch (err) {
-                console.error("Failed to load users:", err);
                 showToast("Failed to load users.", "error");
             }
         };
         fetchUsers();
     }, [API_URL, showToast]);
 
-    // Fetch messages
     useEffect(() => {
         if (!selectedUser) return;
-        
         let cancelled = false;
         
         const fetchMessages = async () => {
             try {
                 const { data } = await axios.get(`${API_URL}/api/messages/${selectedUser._id}?limit=50`);
                 if (!cancelled) {
-                    setMessages(data.messages);
+                    setMessages(prev => {
+                        const merged = [...data.messages, ...prev];
+                        return Array.from(new Map(merged.map(m => [m._id, m])).values())
+                            .filter(m => {
+                                const sId = m.sender?._id || m.sender;
+                                const rId = m.receiver?._id || m.receiver;
+                                return (sId === selectedUser._id && rId === currentUserId) || 
+                                       (sId === currentUserId && rId === selectedUser._id);
+                            })
+                            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+                    });
+                    
                     setHasMore(data.messages.length === 50);
                     setIsTyping(false);
                     
                     setUsers(prev => prev.map(u => u._id === selectedUser._id ? { ...u, unreadCount: 0 } : u));
-                    if (socket) socket.emit("mark_read", { senderId: selectedUser._id });
+                    
+                    // Mark read via Socket or fallback to REST
+                    if (socket && socket.connected) {
+                        socket.emit("mark_read", { senderId: selectedUser._id });
+                    } else {
+                        axios.put(`${API_URL}/api/messages/mark-read/${selectedUser._id}`).catch(() => {});
+                    }
 
                     setTimeout(() => scrollToBottom("auto"), 100);
                 }
             } catch (err) {
-                if (!cancelled) {
-                    console.error("Failed to load conversation:", err);
-                    showToast("Failed to load conversation.", "error");
-                }
+                if (!cancelled) showToast("Failed to load conversation.", "error");
             }
         };
         fetchMessages();
-        
         return () => { cancelled = true; };
-    }, [selectedUser, API_URL, socket, showToast]);
+    }, [selectedUser, API_URL, socket, showToast, currentUserId]);
 
-    // Socket listeners
     useEffect(() => {
         if (!socket || !currentUserId) return;
 
@@ -109,6 +131,9 @@ const Chat = () => {
             if (selectedUser && (msgSenderId === selectedUser._id || (msgSenderId === currentUserId && msgReceiverId === selectedUser._id))) {
                 setMessages((prev) => {
                     const newMessages = [...prev, message];
+                    const unique = Array.from(new Map(newMessages.map(item => [item._id, item])).values())
+                        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+                    
                     if (messagesContainerRef.current) {
                         const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
                         const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
@@ -116,16 +141,14 @@ const Chat = () => {
                             setTimeout(() => scrollToBottom("smooth"), 50);
                         }
                     }
-                    return newMessages;
+                    return unique;
                 });
                 if (msgSenderId !== currentUserId) socket.emit("mark_read", { senderId: msgSenderId });
             }
             
             setUsers((prev) => prev.map((u) => {
-                // Determine if this incoming/outgoing event pertains to this user row
                 const isRelevant = u._id === msgSenderId || (msgSenderId === currentUserId && u._id === msgReceiverId);
                 if (isRelevant) {
-                    // Prevent our own outgoing cross-tab messages from triggering unread counts on the UI
                     const isUnread = !selectedUser || (selectedUser._id !== u._id && msgSenderId !== currentUserId);
                     return { 
                         ...u, 
@@ -149,14 +172,21 @@ const Chat = () => {
             if (selectedUser && selectedUser._id === senderId) { 
                 setIsTyping(true); 
                 setTimeout(() => scrollToBottom("smooth"), 50); 
+                
+                if (remoteTypingTimeoutRef.current) clearTimeout(remoteTypingTimeoutRef.current);
+                remoteTypingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000);
             }
         };
         
         const handleStopTyping = (senderId) => { 
-            if (selectedUser && selectedUser._id === senderId) setIsTyping(false); 
+            if (selectedUser && selectedUser._id === senderId) {
+                setIsTyping(false);
+                if (remoteTypingTimeoutRef.current) clearTimeout(remoteTypingTimeoutRef.current);
+            }
         };
 
         const handleMessageError = (data) => {
+            setNewMessage(prev => prev || lastSentRef.current); // Restore text on failure
             showToast(data.message || "An error occurred", "error");
         };
 
@@ -184,29 +214,50 @@ const Chat = () => {
     }, [socket, currentUserId, selectedUser, showToast]);
 
     const loadMoreMessages = async () => {
-        if (!messages.length || !selectedUser) return;
+        if (!messages.length || !selectedUser || isLoadingMore) return;
+        setIsLoadingMore(true);
         try {
             const { data } = await axios.get(`${API_URL}/api/messages/${selectedUser._id}?cursor=${messages[0]._id}&limit=50`);
             if (data.messages.length < 50) setHasMore(false);
-            setMessages((prev) => [...data.messages, ...prev]);
+            setMessages((prev) => {
+                const merged = [...data.messages, ...prev];
+                return Array.from(new Map(merged.map(m => [m._id, m])).values())
+                    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            });
         } catch (err) {
-            console.error("Pagination error:", err);
             showToast("Pagination failed.", "error");
+        } finally {
+            setIsLoadingMore(false);
         }
     };
 
-    const handleSend = (e) => {
+    const handleSend = async (e) => {
         if (e) e.preventDefault();
         const trimmed = newMessage.trim();
-        if (!socket) return showToast("Not connected — reconnecting...", "error");
         if (!trimmed || !selectedUser) return;
+        
+        lastSentRef.current = trimmed;
+        setNewMessage(""); // Optimistic clear
+        if (textareaRef.current) textareaRef.current.style.height = 'auto';
+
+        if (!socket || !socket.connected) {
+            try {
+                const { data } = await axios.post(`${API_URL}/api/messages`, { receiverId: selectedUser._id, text: trimmed });
+                setMessages(prev => {
+                    const exists = prev.find(m => m._id === data.message._id);
+                    if (exists) return prev;
+                    return [...prev, data.message];
+                });
+            } catch (err) {
+                setNewMessage(lastSentRef.current);
+                showToast("Failed to send message via REST.", "error");
+            }
+            return;
+        }
         
         socket.emit("send_message", { receiverId: selectedUser._id, text: trimmed });
         socket.emit("stop_typing", { receiverId: selectedUser._id });
         myTypingRef.current = false;
-        
-        setNewMessage("");
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
     };
 
     const handleKeyDown = (e) => {
@@ -221,7 +272,7 @@ const Chat = () => {
         e.target.style.height = 'auto'; 
         e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`; 
         
-        if (socket && selectedUser) {
+        if (socket && selectedUser && socket.connected) {
             if (!myTypingRef.current) {
                 socket.emit("typing", { receiverId: selectedUser._id }); 
                 myTypingRef.current = true;
@@ -253,14 +304,18 @@ const Chat = () => {
         setContextMenu(null);
     };
 
-    const deleteMessage = () => {
-        if (!socket) {
-            showToast("Not connected — reconnecting...", "error");
-            setContextMenu(null);
-            return;
-        }
+    const deleteMessage = async () => {
         if (contextMenu?.msg?._id && selectedUser) {
-            socket.emit("delete_message", { messageId: contextMenu.msg._id, receiverId: selectedUser._id });
+            if (socket && socket.connected) {
+                socket.emit("delete_message", { messageId: contextMenu.msg._id, receiverId: selectedUser._id });
+            } else {
+                try {
+                    await axios.delete(`${API_URL}/api/messages/${contextMenu.msg._id}`);
+                    setMessages(prev => prev.filter(m => m._id !== contextMenu.msg._id));
+                } catch (err) {
+                    showToast("Failed to delete via REST.", "error");
+                }
+            }
         }
         setContextMenu(null);
     };
@@ -394,7 +449,9 @@ const Chat = () => {
                         </div>
 
                         <div className="messages-container" ref={messagesContainerRef}>
-                            {hasMore && <button onClick={loadMoreMessages} className="load-more-btn">Load previous messages</button>}
+                            {hasMore && <button onClick={loadMoreMessages} disabled={isLoadingMore} className="load-more-btn">
+                                {isLoadingMore ? 'Loading...' : 'Load previous messages'}
+                            </button>}
                             
                             {messages.length === 0 ? (
                                 <div className="empty-state">
@@ -441,7 +498,8 @@ const Chat = () => {
                                     onChange={handleTypingChange} 
                                     onKeyDown={handleKeyDown} 
                                     placeholder="Type a message..." 
-                                    rows={1} 
+                                    rows={1}
+                                    maxLength={2000}
                                 />
                                 <button type="submit" className="chat-send-btn" disabled={!newMessage.trim()}>
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
