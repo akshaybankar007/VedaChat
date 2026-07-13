@@ -12,7 +12,7 @@ const generateToken = (id) => {
 
 export const register = async (req, res, next) => {
     try {
-        // Gap 19 / Logic 5: Strict early trim prevents bypass
+        //trict early trim prevents bypass
         const username = req.body.username?.trim();
         const email = req.body.email?.trim();
         const phone = req.body.phone?.trim();
@@ -28,33 +28,33 @@ export const register = async (req, res, next) => {
         if (email) userData.email = email;
         if (phone) userData.phone = phone;
 
-        // Logic 6: Removed explicit pre-check to let MongoDB's unique index natively trigger 11000 Error
+        
         const user = await User.create(userData);
 
         res.status(201).json({
             success: true,
             message: "Registration successful",
             token: generateToken(user._id),
-            // Inconsistency 13: Returned _id to match UI mapping
+            
             user: { _id: user._id, username: user.username, email: user.email, phone: user.phone }
         });
     } catch (error) {
-        next(error); // Inconsistency 10
+        next(error); 
     }
 };
 
 export const login = async (req, res, next) => {
     try {
-        const identifier = req.body.identifier?.trim(); // Gap 19
+        const identifier = req.body.identifier?.trim(); 
         const password = req.body.password;
 
         if (!identifier || !password) {
             return res.status(400).json({ success: false, message: "Provide identifier and password" });
         }
 
-        // Critical 2 fix requires `.select("+password")` to log them in
+       
         const user = await User.findOne({
-            $or: [{ username: identifier }, { email: identifier }, { phone: identifier }]
+            $or: [{ username: identifier }, { email: identifier.toLowerCase() }, { phone: identifier }]
         }).select("+password");
 
         if (!user) {
@@ -71,9 +71,9 @@ export const login = async (req, res, next) => {
             success: true,
             message: "Login successful",
             token: generateToken(user._id),
-            user: { _id: user._id, username: user.username, email: user.email, phone: user.phone } // Inconsistency 13
+            user: { _id: user._id, username: user.username, email: user.email, phone: user.phone }
         });
     } catch (error) {
-        next(error); // Inconsistency 10
+        next(error); 
     }
 };

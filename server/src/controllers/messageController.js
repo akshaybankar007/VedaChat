@@ -1,3 +1,4 @@
+
 import Message from "../models/Message.js";
 
 export const getMessages = async (req, res, next) => {
@@ -17,7 +18,12 @@ export const getMessages = async (req, res, next) => {
 
         if (cursor) {
             const lastMessage = await Message.findById(cursor);
-            if (!lastMessage) {
+            const isValidCursor = lastMessage && (
+                (lastMessage.sender.toString() === currentUserId && lastMessage.receiver.toString() === otherUserId) ||
+                (lastMessage.sender.toString() === otherUserId && lastMessage.receiver.toString() === currentUserId)
+            );
+
+            if (!isValidCursor) {
                 // Logic 8: Previously silently failed, returning duplicate new pages. Added 400 Bad Request
                 const error = new Error("Invalid pagination cursor");
                 error.statusCode = 400;
@@ -52,6 +58,11 @@ export const sendMessage = async (req, res, next) => {
         const newMessage = await Message.create({ sender: req.user.id, receiver: receiverId, text: text.trim() });
         const populatedMessage = await newMessage.populate("sender", "username");
         
+        const io = req.app.get("io");
+        if (io) {
+            io.to(receiverId).to(req.user.id).emit("receive_message", populatedMessage);
+        }
+        
         res.status(201).json({ success: true, message: populatedMessage });
     } catch (error) {
         next(error);
@@ -67,6 +78,12 @@ export const deleteMessage = async (req, res, next) => {
             error.statusCode = 404;
             throw error;
         }
+
+        const io = req.app.get("io");
+        if (io) {
+            io.to(msg.receiver.toString()).to(req.user.id).emit("message_deleted", id);
+        }
+
         res.json({ success: true, message: "Message deleted successfully" });
     } catch (error) {
         next(error);
@@ -82,6 +99,12 @@ export const markMessagesRead = async (req, res, next) => {
             { sender: senderId, receiver: req.user.id, isRead: false },
             { isRead: true }
         );
+
+        const io = req.app.get("io");
+        if (io) {
+            io.to(senderId).emit("messages_read", { readerId: req.user.id });
+        }
+
         res.json({ success: true, message: "Messages marked as read" });
     } catch (error) {
         next(error);
