@@ -14,13 +14,13 @@ import { errorHandler } from "./middleware/errorMiddleware.js";
 
 dotenv.config();
 
-// Critical 18: Process level handlers
+//Process level handlers
 process.on('uncaughtException', (err) => {
     console.error('UNCAUGHT EXCEPTION! Shutting down...', err);
     process.exit(1);
 });
 
-// Critical 18: Environment variable startup check
+// Environment variable startup check
 if (!process.env.JWT_SECRET || !process.env.MONGO_URI) {
     console.error("FATAL ERROR: JWT_SECRET or MONGO_URI is not defined.");
     process.exit(1);
@@ -31,7 +31,7 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Inconsistency 14: Unified CORS definition
+// Unified CORS definition
 const CORS_ORIGIN = process.env.CLIENT_URL || "http://localhost:5173";
 
 const io = new Server(server, {
@@ -40,6 +40,8 @@ const io = new Server(server, {
         credentials: true
     }
 });
+
+app.set("io", io);
 
 app.use(cors({
     origin: CORS_ORIGIN,
@@ -54,8 +56,8 @@ app.use("/api/users", userRoutes);
 
 app.get("/", (req, res) => res.status(200).json({ success: true, message: "VEDACHAT Backend Running 🚀" }));
 
-// Gap 18: Catch-all 404 router before global error handler
-app.all('*', (req, res, next) => {
+//Catch-all 404 router before global error handler
+app.use((req, res, next) => {
     const err = new Error(`Route ${req.originalUrl} not found`);
     err.statusCode = 404;
     next(err);
@@ -92,7 +94,7 @@ io.on("connection", (socket) => {
         try {
             const { receiverId, text } = data;
             
-            // Inconsistency 11: Payload validation
+            // Payload validation
             if (!receiverId || !text || typeof text !== 'string' || text.trim() === '') {
                 return socket.emit("message_error", { message: "Invalid message payload" }); // Logic 9: Failure feedback
             }
@@ -161,7 +163,7 @@ io.on("connection", (socket) => {
 const PORT = process.env.PORT || 5000;
 const serverInstance = server.listen(PORT, () => console.log(`Server surviving on http://localhost:${PORT}`));
 
-// Critical 18: Unhandled Promise Rejections process shutdown
+//Unhandled Promise Rejections process shutdown
 process.on('unhandledRejection', (err) => {
     console.error('UNHANDLED REJECTION! Shutting down...', err);
     serverInstance.close(() => process.exit(1));
